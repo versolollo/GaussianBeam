@@ -3,39 +3,37 @@ import scipy as sp
 import scipy.optimize
 import matplotlib.pyplot as plt
 
-#plt.style.use("~/styling.mplstyle")
-SPEED_LIGHT = 299_792_458
+plt.style.use("~/styling.mplstyle")
+
 
 class GaussianBeam:
-    def __init__(self, wlength_free=None, zr=2, k=None, z0=0, refractive_index=1):
-        if k is None and wlength_free is None:
+    def __init__(self, wlength=None, zr=2, k=None, z0=0):
+        if k is None and wlength is None:
             raise Exception("one between k and wlength needs to be specified.")
-        elif k is not None and wlength_free is not None:
+        elif k is not None and wlength is not None:
             raise Exception(
                 "Can't specify both k and wlength as they refer to the same quantity."
             )
         self.z0 = z0
         self.zr = zr
-        if wlength_free is None:
-            wlength_free = 2 * np.pi / k
-        self.wlength_free = wlength_free  # radiation wavelength
-        self.refractive_index = refractive_index
-        self.omega = (SPEED_LIGHT / self.refractive_index) * self.k  # angular frequency in vacuum
-
+        if wlength is None:
+            wlength = 2 * np.pi / k
+        self.wlength = wlength  # radiation wavelength
+        self.omega = 3e8 * self.k  # angular frequency in vacuum
 
     @property
     def NAe2(self):
-        angle = np.arctan(np.sqrt(self.wlength_free / (self.zr * np.pi)))
+        angle = np.arctan(np.sqrt(self.wlength / (self.zr * np.pi)))
         return np.sin(angle)
 
     @NAe2.setter
     def NAe2(self, new_NAe2):
         angle = np.arcsin(new_NAe2)
-        self.zr = self.wlength_free / (np.tan(angle) ** 2 * np.pi)
+        self.zr = self.wlength / (np.tan(angle) ** 2 * np.pi)
 
     @property
     def k(self):
-        return 2 * np.pi * self.refractive_index / self.wlength_free
+        return 2 * np.pi / self.wlength
 
     @property
     def w0(self):
@@ -86,7 +84,7 @@ class GaussianBeam:
 
     def copy(self):
         return GaussianBeam(
-            zr=-np.imag(self.q), z0=self.z0, wlength_free=self.wlength_free
+            zr=-np.imag(self.q), z0=self.z0, wlength=self.wlength
         )
 
     def apply_lens(self, f):
@@ -115,8 +113,6 @@ class GaussianBeam:
     def plot(self, ax=None, zstart=None, zend=None, **kwargs):
         if ax is None:
             ax = plt.gca()
-            ax.set_xlabel('$z$ [m]')
-            ax.set_ylabel('$r$ [m]')
         if zstart is None:
             zstart = self.z0 - 2 * self.zr
         if zend is None:
@@ -129,7 +125,6 @@ class GaussianBeam:
             alpha=0.3,
             **kwargs,
         )
-
 
     def fit_data(self, zvalues, diam_13_5, p0, return_fit=False):
         """
@@ -150,7 +145,7 @@ class GaussianBeam:
         rad_13_5 = diam_13_5 / 2
 
         def fit_func(z, z0, zr):
-            w0 = np.sqrt(self.wlength_free * zr / np.pi) * np.sqrt(
+            w0 = np.sqrt(self.wlength * zr / np.pi) * np.sqrt(
                 1 + (z - z0) ** 2 / zr**2
             )
             return w0
@@ -172,34 +167,17 @@ class GaussianBeam:
         return f"\n{self.z0:.2e}\t{self.w(0):.2e}\t{self.w0:.2e}\t{self.zr:.2e}\t{self.NAe2:.2e}"
 
     def __repr__(self):
-        repr_str = f"Gaussian Laser Beam @ {self.wlength_free * 1e9:.1f}nm\n---z0---\t--w(0)--\t---w0---\t---zr---\t--NAe2--"
+        repr_str = f"Gaussian Laser Beam @ {self.wlength*1e9:.1f}nm\n---z0---\t--w(0)--\t---w0---\t---zr---\t--NAe2--"
         repr_str += self._get_parameter_string()
         return repr_str
-    
-class Ray:
-    def __init__(self, y, theta):
-        self.y=y
-        self.theta=theta
-        
-    @property 
-    def z0(self):
-        return - self.y * np.tan(self.theta)
-    
-    def copy(self):
-        return Ray(self.y, self.theta)
-    
-    def apply_transform(self, y, theta):
-        pass
+
 
 class OpticalSystem:
-    def __init__(self, g: GaussianBeam, n0=1):
+    def __init__(self, g: GaussianBeam, n0: 1):
         self.gaussian_beams = [g]
         self.partitions = ["START"]
         self.refractive_indeces = [n0]
 
-    def fiber_coupler(self, f):
-        self.propagate(f)
-        self.thin_lens(f)
     def thin_lens(self, f):
         """Propagate through a lense placed at z=0"""
         previous_beam = self.gaussian_beams[-1]
@@ -209,7 +187,7 @@ class OpticalSystem:
         self.gaussian_beams.append(
             GaussianBeam(
                 zr=-np.imag(new_q),
-                wlength_free=previous_beam.wlength_free,
+                k=self.k,
                 z0=-(np.real(new_q)),  # z0=-(np.real(new_q) - z_lens),
             )
         )
@@ -225,9 +203,8 @@ class OpticalSystem:
         self.gaussian_beams.append(
             GaussianBeam(
                 zr=-np.imag(new_q),
-                wlength_free=previous_beam.wlength_free,
+                k=previous_beam.k,
                 z0=-(np.real(new_q)),
-                refractive_index=previous_beam.refractive_index
             )
         )
         self.partitions.append(f"d={d}")
@@ -246,23 +223,12 @@ class OpticalSystem:
         self.gaussian_beams.append(
             GaussianBeam(
                 zr=-np.imag(new_q),
-                wlength_free=previous_beam.wlength_free,
+                k=previous_beam.k,
                 z0=-(np.real(new_q)),
-                refractive_index=n_new
             )
         )
         self.refractive_indeces.append(n_new)
         self.partitions.append(f"R={R}({n_new})")
-
-    def __repr__(self):
-        repr_str = f"Gaussian Laser Beam @ {self.gaussian_beams[0].wlength_free}nm\n#\t---z0---\t--w(0)--\t---w0---\t---zr---\t--NAe2--\t--n--"
-        for i_b, b in enumerate(self.gaussian_beams):
-            b_str = f"\n{i_b}\t{b.z0:.3e}\t{b.w(0):.3e}\t{b.w0:.3e}\t{b.zr:.3e}\t{b.NAe2:.3e}\t{b.refractive_index}\t[{self.partitions[i_b]}]"
-            repr_str += b_str
-        return repr_str
-
-    def __getitem__(self, i):
-        return self.gaussian_beams[i]
 
 
 class LaserBeam:
@@ -305,7 +271,7 @@ class LaserBeam:
             self.gaussian_beams[0].plot(ax=ax)
 
     def __repr__(self):
-        repr_str = f"Gaussian Laser Beam @ {self.gaussian_beams[0].wlength_free * 1e9}nm\n#\t---z0---\t--w(0)--\t---w0---\t---zr---\t--NAe2--"
+        repr_str = f"Gaussian Laser Beam @ {self.gaussian_beams[0].wlength_free}nm\n#\t---z0---\t--w(0)--\t---w0---\t---zr---\t--NAe2--"
         for i_b, b in enumerate(self.gaussian_beams):
             b_str = f"\n{i_b}\t{b.z0:.2e}\t{b.w(0):.2e}\t{b.w0:.2e}\t{b.zr:.2e}\t{b.NAe2:.2e}"
             repr_str += b_str
@@ -316,7 +282,7 @@ class LaserBeam:
 
 
 def fiber_coupler(lam=461e-9, NAe2=0.01, fc=7e-3):
-    g = GaussianBeam(zr=1, wlength_free=lam)
+    g = GaussianBeam(zr=1, wlength=lam)
     g.NAe2 = NAe2
     beam = LaserBeam(g)
     beam.add_lens(fc, fc)
@@ -339,30 +305,18 @@ if __name__ == "__main__":
     lbeam.plot_beam(zstop=30e-3, zstart=0)
     lbeam"""
 
-    g = GaussianBeam(zr=2, wlength_free=1033e-9)
-    os0 = OpticalSystem(g)
-    os0.propagate(0.04947)
-    os0.thin_lens(0.04947)
-    print(os0)
-
-    g1 = GaussianBeam(zr=2, wlength_free=1033e-9)
-    os1 = OpticalSystem(g1)
-    os1.propagate(0.04947)
-    os1.curved_surf(25.7e-3, n_new=1.52)
-    os1.propagate(0.5e-3)
-    os1.curved_surf(np.inf, n_new=1)
-    print(os1)
-
-
-
-
+    g = GaussianBeam(zr=5, wlength=421e-9)
+    g.NAe2 = 0.07
+    lbeam = LaserBeam(g)
+    lbeam.apply_lens(8e-3, 8e-3)
     # beam = fiber_coupler(NAe2=0.11, fc=6.2e-3)
     # beam = fiber_coupler(NAe2=0.011, fc=20e-3)
-    #beam = lbeam[1]
-    #print(lbeam)
-    #zlist = np.linspace(0, 500e-3, 1000)
-    #wlist = beam.w(zlist) * 2
+    beam = lbeam[1]
+    zlist = np.linspace(0, 500e-3, 1000)
+    wlist = beam.w(zlist) * 2
 
-    #plt.figure()
-    #plt.plot(zlist * 1000 / 25, wlist)
-    #plt.show()
+    plt.figure()
+    plt.plot(zlist * 1000 / 25, wlist)
+    plt.show()
+
+# This is wrong
