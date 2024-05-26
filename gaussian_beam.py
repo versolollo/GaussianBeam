@@ -3,14 +3,11 @@ import scipy as sp
 import scipy.optimize
 import matplotlib.pyplot as plt
 
-#plt.style.use("~/styling.mplstyle")
+# plt.style.use("~/styling.mplstyle")
 SPEED_LIGHT = 299_792_458  # TODO: use scipy constant.
 
-class Light():
-    def __init__(self):
-        pass
 
-class GaussianBeam(Light):
+class GaussianBeam:
     def __init__(self, wlength_free=None, zr=2, k=None, z0=0, refractive_index=1):
         if k is None and wlength_free is None:
             raise Exception("one between k and wlength needs to be specified.")
@@ -25,7 +22,6 @@ class GaussianBeam(Light):
         self.wlength_free = wlength_free  # radiation wavelength
         self.refractive_index = refractive_index
         self.omega = (SPEED_LIGHT / self.refractive_index) * self.k  # angular frequency in vacuum
-
 
     @property
     def NAe2(self):
@@ -47,7 +43,7 @@ class GaussianBeam(Light):
 
     @w0.setter
     def w0(self, w0_new):
-        zr_new = w0_new**2 * self.k / 2
+        zr_new = w0_new ** 2 * self.k / 2
         self.zr = zr_new
 
     @property
@@ -85,7 +81,7 @@ class GaussianBeam(Light):
     def __call__(self, r, z, t=0):
 
         return np.exp(1j * (self.k * (z - self.z0) - self.omega * t)) * np.exp(
-            1j * self.k * r**2 / (2 * self.q(z))
+            1j * self.k * r ** 2 / (2 * self.q(z))
         )
 
     def copy(self):
@@ -134,7 +130,6 @@ class GaussianBeam(Light):
             **kwargs,
         )
 
-
     def fit_data(self, zvalues, diam_13_5, p0, return_fit=False):
         """
         Fit z0 and zr given data of the beam diameter (13.5% point)
@@ -155,7 +150,7 @@ class GaussianBeam(Light):
 
         def fit_func(z, z0, zr):
             w0 = np.sqrt(self.wlength_free * zr / np.pi) * np.sqrt(
-                1 + (z - z0) ** 2 / zr**2
+                1 + (z - z0) ** 2 / zr ** 2
             )
             return w0
 
@@ -179,7 +174,7 @@ class GaussianBeam(Light):
         repr_str = f"Gaussian Laser Beam @ {self.wlength_free * 1e9:.1f}nm\n---z0---\t--w(0)--\t---w0---\t---zr---\t--NAe2--"
         repr_str += self._get_parameter_string()
         return repr_str
-    
+
     def apply_transform(self, y, theta):
         """Calculate q factor from ABCD matrices output"""
         new_q = vec_temp[0] / vec_temp[1]
@@ -191,23 +186,31 @@ class GaussianBeam(Light):
                 refractive_index=previous_beam.refractive_index
             )
         )
-        
-    
+
+    def power_overlap(self, other_beam):
+        """calculate the power overlap between two aligned gaussian beams. This is useful, for instance,
+        to compute predicted fiber coupling efficiencies."""
+        delta_z = self.z0 - other_beam.z0
+        average_rayleigh = 1 / 2 * (self.zr + other_beam.zr)
+        return 4 * self.zr * other_beam.zr / (delta_z ** 2 + 4 * average_rayleigh ** 2)
+
+
 class Ray(Light):
     def __init__(self, y, theta):
-        self.y=y
-        self.theta=theta
-        
-    @property 
+        self.y = y
+        self.theta = theta
+
+    @property
     def z0(self):
         return - self.y * np.tan(self.theta)
-    
+
     def copy(self):
         return Ray(self.y, self.theta)
-    
+
     def apply_transform(self, vector):
         y, theta = vector
         return Ray(y, theta)
+
 
 class OpticalSystem:
     def __init__(self, g: GaussianBeam, n0=1):
@@ -218,6 +221,7 @@ class OpticalSystem:
     def fiber_coupler(self, f):
         self.propagate(f)
         self.thin_lens(f)
+
     def thin_lens(self, f):
         """Propagate through a lense placed at z=0"""
         previous_beam = self.gaussian_beams[-1]
@@ -357,7 +361,10 @@ if __name__ == "__main__":
     lbeam = LaserBeam(g)
     lbeam.add_lens(10e-3, 10e-3)
     lbeam.plot_beam(zstop=30e-3, zstart=0)
-    lbeam"""
+    lbeam
+    
+    Running a few tests.
+    """
 
     g = GaussianBeam(zr=2, wlength_free=1033e-9)
     os0 = OpticalSystem(g)
@@ -372,21 +379,33 @@ if __name__ == "__main__":
     os1.propagate(0.5e-3)
     os1.curved_surf(np.inf, n_new=1)
     print(os1)
+    print('\n\n')
 
+    b1 = GaussianBeam(wlength_free=1092e-9)
+    b2 = GaussianBeam(wlength_free=1092e-9)
+    b1.NAe2 = 0.070
+    b2.NAe2 = 0.084
+    print('power overlap: ', b1.power_overlap(b2))
+
+
+# %%
 
 def lens_maker(R1, R2, n=1.52):
-    """ ( : positive curvature, ) : negative curvature"""
+    """ ( : positive curvature, ) : negative curvature
+    assuming air to be the outer medium.
+    """
     # display(f_rep)
     return 1 / ((n - 1.0003) / 1.0003 * (1 / R1 - 1 / R2))
 
-
     # beam = fiber_coupler(NAe2=0.11, fc=6.2e-3)
     # beam = fiber_coupler(NAe2=0.011, fc=20e-3)
-    #beam = lbeam[1]
-    #print(lbeam)
-    #zlist = np.linspace(0, 500e-3, 1000)
-    #wlist = beam.w(zlist) * 2
+    # beam = lbeam[1]
+    # print(lbeam)
+    # zlist = np.linspace(0, 500e-3, 1000)
+    # wlist = beam.w(zlist) * 2
 
-    #plt.figure()
-    #plt.plot(zlist * 1000 / 25, wlist)
-    #plt.show()
+    # plt.figure()
+    # plt.plot(zlist * 1000 / 25, wlist)
+    # plt.show()
+
+# %%
