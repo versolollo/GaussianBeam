@@ -1,0 +1,7 @@
+README.md
+setup.py
+gaussian_beam.egg-info/PKG-INFO
+gaussian_beam.egg-info/SOURCES.txt
+gaussian_beam.egg-info/dependency_links.txt
+gaussian_beam.egg-info/requires.txt
+gaussian_beam.egg-info/top_level.txt

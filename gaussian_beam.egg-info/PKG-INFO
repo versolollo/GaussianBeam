@@ -1,0 +1,16 @@
+Metadata-Version: 2.1
+Name: gaussian_beam
+Version: 1.0
+Summary: A python project to perform gaussian beam optics
+Author: Lorenzo Versini
+Author-email: lorenzo.versini@physics.ox.ac.uk
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Research
+Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: MacOS :: MacOS X
+Classifier: Operating System :: Microsoft :: Windows
+Requires-Dist: numpy
+Requires-Dist: matplotlib
+Requires-Dist: scipy
+
+Propagate gaussian beams through optics and calculate their properties.

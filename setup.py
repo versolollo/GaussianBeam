@@ -5,7 +5,7 @@ VERSION = '1.0'
 DESCRIPTION = "A python project to perform gaussian beam optics"
 LONG_DESCRIPTION = "Propagate gaussian beams through optics and calculate their properties."
 
-setup(name='GaussianBeam',
+setup(name='gaussian_beam',
       version=VERSION, 
       description=DESCRIPTION,
       long_description=LONG_DESCRIPTION,

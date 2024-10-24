@@ -3,12 +3,15 @@ import scipy as sp
 import scipy.optimize
 import matplotlib.pyplot as plt
 
-# plt.style.use("~/styling.mplstyle")
 SPEED_LIGHT = 299_792_458  # TODO: use scipy constant.
-
+nm = 1e-9
+um = 1e-6
+mm = 1e-3
+cm = 1e-2
 
 class GaussianBeam:
-    def __init__(self, wlength_free=None, zr=2, k=None, z0=0, refractive_index=1):
+    def __init__(self, wlength_free: float | None = None, zr: float = 2., k: float | None = None, z0=0,
+                 refractive_index: float = 1.):
         if k is None and wlength_free is None:
             raise Exception("one between k and wlength needs to be specified.")
         elif k is not None and wlength_free is not None:
@@ -86,7 +89,7 @@ class GaussianBeam:
 
     def copy(self):
         return GaussianBeam(
-            zr=-np.imag(self.q), z0=self.z0, wlength_free=self.wlength_free
+            zr=-np.imag(self.q(0)), z0=self.z0, wlength_free=self.wlength_free
         )
 
     def apply_lens(self, f):
@@ -175,41 +178,12 @@ class GaussianBeam:
         repr_str += self._get_parameter_string()
         return repr_str
 
-    def apply_transform(self, y, theta):
-        """Calculate q factor from ABCD matrices output"""
-        new_q = vec_temp[0] / vec_temp[1]
-        self.gaussian_beams.append(
-            GaussianBeam(
-                zr=-np.imag(new_q),
-                wlength_free=previous_beam.wlength_free,
-                z0=-(np.real(new_q)),
-                refractive_index=previous_beam.refractive_index
-            )
-        )
-
     def power_overlap(self, other_beam):
         """calculate the power overlap between two aligned gaussian beams. This is useful, for instance,
         to compute predicted fiber coupling efficiencies."""
         delta_z = self.z0 - other_beam.z0
         average_rayleigh = 1 / 2 * (self.zr + other_beam.zr)
         return 4 * self.zr * other_beam.zr / (delta_z ** 2 + 4 * average_rayleigh ** 2)
-
-
-class Ray(Light):
-    def __init__(self, y, theta):
-        self.y = y
-        self.theta = theta
-
-    @property
-    def z0(self):
-        return - self.y * np.tan(self.theta)
-
-    def copy(self):
-        return Ray(self.y, self.theta)
-
-    def apply_transform(self, vector):
-        y, theta = vector
-        return Ray(y, theta)
 
 
 class OpticalSystem:
@@ -257,8 +231,8 @@ class OpticalSystem:
 
     def curved_surf(self, R, n_new=1.5):
         """Refraction from a curved surface of radius R.
-        R > 0: --(-- surface
-        R < 0: --)-- surface
+        R > 0: ->-(->- surface
+        R < 0: ->-)->- surface
         R = radius of curvature, R > 0 for convex (center of curvature after interface)"""
         previous_beam = self.gaussian_beams[-1]
         n1 = self.refractive_indeces[-1]

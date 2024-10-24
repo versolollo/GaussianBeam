@@ -2,9 +2,14 @@ import numpy as np
 #from gaussian_beam import GaussianBeam
 
 
+def cavity_beam_waist(wlength, L, R1, R2):
+    prefactor = (wlength/np.pi)**2
+    numerator = L * (R1 - L) * (R2 - L) * (R1 + R2 - L)
+    denominator = (R1 + R2 - 2 * L)**2
+    return prefactor * numerator / denominator
+
 class Cavity:
     pass
-
 
 class SymmetricCavity(Cavity):
     def __init__(self, L: float, R: float):
